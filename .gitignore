@@ -1,0 +1,6 @@
+node_modules
+dist
+lambdas
+yarn-error.log
+ddl-script.sql
+.env
