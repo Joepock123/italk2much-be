@@ -4,19 +4,19 @@ import { v4 as uuidv4 } from "uuid";
 import { documentClient } from "../infrastructure/dynamoDb";
 import { Chat, Message } from "./types";
 
-const MEMBER_PREFIX = "member_";
+const MEMBER_KEY = "member_";
+const CONFIG_KEY = "config";
 
 // CHATS TABLE QUERIES
 const chatTableName = "chatsWithSortKey";
 
-// Transaction
 // NB: Transactions can handle up to 10 action requests
-// Threfor for creation of group chats number of members + 1 (chatConfigAction) must be <= 10
+// For creation of group chats number of members + 1 (chatConfigAction) must be <= 10
 export const createOrUpdatePersonalChat = async ({
   chatName,
   members,
 }: Chat) => {
-  // Create chatId with userIds
+  // Should be only two members for personal chat
   const chatId = members.join("-");
 
   // Action to create item for chat configuration
@@ -26,7 +26,7 @@ export const createOrUpdatePersonalChat = async ({
       TableName: chatTableName,
       Item: {
         chatId,
-        sortKey: "config",
+        sortKey: CONFIG_KEY,
         chatName,
         createdAt: now(),
         lastTouched: now(),
@@ -36,7 +36,7 @@ export const createOrUpdatePersonalChat = async ({
 
   // Actions to create item for each member of chat
   const chatMembersAction = members.map((member) => {
-    const sortKey = [MEMBER_PREFIX, member].join("");
+    const sortKey = [MEMBER_KEY, member].join("");
     return {
       Put: {
         TableName: chatTableName,
@@ -55,27 +55,54 @@ export const createOrUpdatePersonalChat = async ({
     TransactItems: [...chatMembersAction, chatConfigAction],
   };
 
-  const response =
+  const res =
     documentClient &&
     (await documentClient.transactWrite(transactionParams).promise());
-  return response;
+  return res;
 };
 
-export const updateChatConfig = async ({
-  chatId,
-  chatName,
-}: {
-  chatId: string;
-  chatName?: string;
-}) => {};
+export const getChatConfig = async (chatId: string) => {
+  const params = {
+    TableName: chatTableName,
+    Key: {
+      chatId,
+      sortKey: CONFIG_KEY,
+    },
+  };
 
-export const updateChatMember = async ({
-  chatId,
-  members,
-}: {
-  chatId: string;
-  members: Array<string>;
-}) => {};
+  const { Item } =
+    documentClient && (await documentClient.get(params).promise());
+  return Item;
+};
+
+var params = {
+  TableName: "Movies",
+  ProjectionExpression: "#yr, title, info.genres, info.actors[0]",
+  KeyConditionExpression: "#yr = :yyyy and title between :letter1 and :letter2",
+  ExpressionAttributeNames: {
+    "#yr": "year",
+  },
+  ExpressionAttributeValues: {
+    ":yyyy": 1992,
+    ":letter1": "A",
+    ":letter2": "L",
+  },
+};
+
+export const getChatMembers = async (chatId: string) => {
+  const params = {
+    TableName: chatTableName,
+    KeyConditionExpression: "chatId = :hkey and begins_with(sortKey, :rkey)",
+    ExpressionAttributeValues: {
+      ":hkey": chatId,
+      ":rkey": MEMBER_KEY,
+    },
+  };
+
+  const { Items } =
+    documentClient && (await documentClient.query(params).promise());
+  return Items;
+};
 
 // MESSAGES TABLE QUERIES
 const messageTableName = "messages";
@@ -93,39 +120,6 @@ export const addMessage = async ({ chatId, ownerId, text }: Message) => {
     ReturnValues: "ALL_OLD",
   };
 
-  const response =
-    documentClient && (await documentClient.put(params).promise());
-  return response;
-};
-
-var params = {
-  TransactItems: [
-    {
-      Put: {
-        TableName: "Table0",
-        Item: {
-          HashKey: "haskey",
-          NumAttribute: 1,
-          BoolAttribute: true,
-          ListAttribute: [1, "two", false],
-          MapAttribute: { foo: "bar" },
-          NullAttribute: null,
-        },
-      },
-    },
-    {
-      Update: {
-        TableName: "Table1",
-        Key: { HashKey: "hashkey" },
-        UpdateExpression: "set #a = :x + :y",
-        ConditionExpression: "#a < :MAX",
-        ExpressionAttributeNames: { "#a": "Sum" },
-        ExpressionAttributeValues: {
-          ":x": 20,
-          ":y": 45,
-          ":MAX": 100,
-        },
-      },
-    },
-  ],
+  const res = documentClient && (await documentClient.put(params).promise());
+  return res;
 };
