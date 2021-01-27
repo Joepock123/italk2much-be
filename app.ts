@@ -7,6 +7,7 @@ const cors = require("cors");
 import { Request, Response, NextFunction } from "express";
 
 import { indexRouter } from "./routes";
+import { chatsRouter } from "./src/chats/chatsRouter";
 import { videosRouter } from "./src/videos/videosRouter";
 
 const app = express();
@@ -24,7 +25,7 @@ app.use(cookieParser());
 app.use(cors());
 
 // *** Routes ***
-app.use("/", [indexRouter, videosRouter]);
+app.use("/", [indexRouter, videosRouter, chatsRouter]);
 
 // catch 404 and forward to error handler
 app.use((req: Request, res: Response, next: NextFunction) => {
