@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { addMessage } from "./chatsQueries";
+import { addMessage, createOrUpdatePersonalChat } from "./chatsQueries";
 
 const chatsRouter = Router();
 
@@ -8,6 +8,22 @@ chatsRouter.get(
   (req: Request, res: Response, next: NextFunction) => {
     const chatId = req.params.chatId;
     console.log("In the GET chat route", "chatId", chatId);
+  }
+);
+
+chatsRouter.put(
+  "/chat",
+  async (req: Request, res: Response, next: NextFunction) => {
+    const body = req.body;
+
+    try {
+      const response = await createOrUpdatePersonalChat({ ...body });
+      res.json({ message: "Chat successfully created" });
+      console.log("createOrUpdatePersonalChat RESPONSE:", response);
+    } catch (err) {
+      console.error(err);
+      res.send(err);
+    }
   }
 );
 

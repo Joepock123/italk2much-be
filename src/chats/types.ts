@@ -1,8 +1,10 @@
 export type Chat = {
-  chatId: number;
-  createdAt: Date;
-  lastTouched: Date;
-  participants: Array<User>;
+  chatId: string;
+  chatName?: string;
+  ownerId?: string;
+  createdAt: number;
+  lastTouched: number;
+  members: Array<string>;
   messages: Array<Message>;
 };
 
