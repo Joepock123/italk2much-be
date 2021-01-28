@@ -1,14 +1,17 @@
+import { time } from "console";
 import { now } from "moment";
 import { v4 as uuidv4 } from "uuid";
 
 import { documentClient } from "../infrastructure/dynamoDb";
 import { Chat, Message } from "./types";
 
-const MEMBER_KEY = "member_";
 const CONFIG_KEY = "config";
+const MEMBER_KEY = "member_";
+const MESSAGE_KEY = "message_";
+const CHATS_TABLE_NAME = "chatsWithSortKey";
+const MESSAGES_TABLE_NAME = "messagesWithSortKey";
 
 // CHATS TABLE QUERIES
-const chatTableName = "chatsWithSortKey";
 
 // NB: Transactions can handle up to 10 action requests
 // For creation of group chats number of members + 1 (chatConfigAction) must be <= 10
@@ -23,7 +26,7 @@ export const createOrUpdatePersonalChat = async ({
   const chatConfigAction = {
     // Specify the action type (can also use update, delete)
     Put: {
-      TableName: chatTableName,
+      TableName: CHATS_TABLE_NAME,
       Item: {
         chatId,
         sortKey: CONFIG_KEY,
@@ -39,7 +42,7 @@ export const createOrUpdatePersonalChat = async ({
     const sortKey = [MEMBER_KEY, member].join("");
     return {
       Put: {
-        TableName: chatTableName,
+        TableName: CHATS_TABLE_NAME,
         Item: {
           chatId,
           sortKey,
@@ -63,7 +66,7 @@ export const createOrUpdatePersonalChat = async ({
 
 export const getChatConfig = async (chatId: string) => {
   const params = {
-    TableName: chatTableName,
+    TableName: CHATS_TABLE_NAME,
     Key: {
       chatId,
       sortKey: CONFIG_KEY,
@@ -75,23 +78,9 @@ export const getChatConfig = async (chatId: string) => {
   return Item;
 };
 
-var params = {
-  TableName: "Movies",
-  ProjectionExpression: "#yr, title, info.genres, info.actors[0]",
-  KeyConditionExpression: "#yr = :yyyy and title between :letter1 and :letter2",
-  ExpressionAttributeNames: {
-    "#yr": "year",
-  },
-  ExpressionAttributeValues: {
-    ":yyyy": 1992,
-    ":letter1": "A",
-    ":letter2": "L",
-  },
-};
-
 export const getChatMembers = async (chatId: string) => {
   const params = {
-    TableName: chatTableName,
+    TableName: CHATS_TABLE_NAME,
     KeyConditionExpression: "chatId = :hkey and begins_with(sortKey, :rkey)",
     ExpressionAttributeValues: {
       ":hkey": chatId,
@@ -105,19 +94,36 @@ export const getChatMembers = async (chatId: string) => {
 };
 
 // MESSAGES TABLE QUERIES
-const messageTableName = "messages";
-export const addMessage = async ({ chatId, ownerId, text }: Message) => {
+
+export const getChatMessages = async (chatId: string) => {
   const params = {
-    TableName: messageTableName,
+    TableName: MESSAGES_TABLE_NAME,
+    KeyConditionExpression: "chatId = :hkey",
+    ExpressionAttributeValues: {
+      ":hkey": chatId,
+    },
+  };
+
+  const { Items } =
+    documentClient && (await documentClient.query(params).promise());
+  return Items;
+};
+
+export const addMessage = async ({ chatId, ownerId, text }: Message) => {
+  const timestamp = now();
+  const messageId = uuidv4();
+  const sortKey = [MESSAGE_KEY, timestamp, messageId].join("_");
+  const params = {
+    TableName: MESSAGES_TABLE_NAME,
     Item: {
-      messageId: uuidv4(),
       chatId,
+      sortKey,
+      messageId,
       ownerId,
-      createdAt: now(),
-      lastTouched: now(),
+      createdAt: timestamp,
+      lastTouched: timestamp,
       text: text,
     },
-    ReturnValues: "ALL_OLD",
   };
 
   const res = documentClient && (await documentClient.put(params).promise());
