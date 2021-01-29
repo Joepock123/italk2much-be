@@ -5,9 +5,37 @@ import {
   getChatConfig,
   getChatMembers,
   getChatMessages,
+  getMemberItemsFromUserId,
 } from "./chatsQueries";
 
 const chatsRouter = Router();
+
+chatsRouter.get(
+  "/chats/user/:userId",
+  async (req: Request, res: Response, next: NextFunction) => {
+    const userId = req.params.userId;
+    try {
+      const chatMembers = await getMemberItemsFromUserId(userId);
+      const chatIdsList = chatMembers?.map((chat) => chat.chatId) || [];
+      const chats = await Promise.all(
+        chatIdsList?.map(async (chatId) => {
+          const chatConfig = await getChatConfig(chatId);
+          const chatMembers = await getChatMembers(chatId);
+          const chatMessages = await getChatMessages(chatId);
+          return {
+            ...chatConfig,
+            members: chatMembers,
+            messages: chatMessages,
+          };
+        })
+      );
+      res.send({ chats });
+    } catch (err) {
+      console.error(err);
+      res.send(err);
+    }
+  }
+);
 
 chatsRouter.get(
   "/chats/:chatId",

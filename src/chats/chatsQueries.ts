@@ -9,6 +9,7 @@ const CONFIG_KEY = "config";
 const MEMBER_KEY = "member_";
 const MESSAGE_KEY = "message_";
 const CHATS_TABLE_NAME = "chatsWithSortKey";
+const CHATS_GSI_NAME = "sortKeyIndex";
 const MESSAGES_TABLE_NAME = "messagesWithSortKey";
 
 // CHATS TABLE QUERIES
@@ -62,6 +63,22 @@ export const createOrUpdatePersonalChat = async ({
     documentClient &&
     (await documentClient.transactWrite(transactionParams).promise());
   return res;
+};
+
+export const getMemberItemsFromUserId = async (userId: string) => {
+  const gsiKey = [MEMBER_KEY, userId].join("");
+  const params = {
+    TableName: CHATS_TABLE_NAME,
+    IndexName: CHATS_GSI_NAME,
+    KeyConditionExpression: "sortKey = :hkey",
+    ExpressionAttributeValues: {
+      ":hkey": gsiKey,
+    },
+  };
+
+  const { Items } =
+    documentClient && (await documentClient.query(params).promise());
+  return Items;
 };
 
 export const getChatConfig = async (chatId: string) => {
